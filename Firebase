@@ -5,7 +5,7 @@ from firebase_admin import credentials, db
 # Firebase credentials path
 FIREBASE_CRED_PATH = os.getenv("FIREBASE_CRED_PATH", r"C:\Users\ahama\Downloads\New folder (3)\packet-tracer-6ad46-firebase-adminsdk-fbsvc-8989d73c27.json")
 
-# Path to your .txt file
+# Path to .txt file
 TXT_FILE_PATH = r"C:\Users\ahama\OneDrive\Desktop\router.txt"  # Replace with the actual path to your file
 
 # Initialize Firebase
