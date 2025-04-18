@@ -1,0 +1,95 @@
+import os
+import firebase_admin
+from firebase_admin import credentials, db
+
+# Firebase credentials path
+FIREBASE_CRED_PATH = os.getenv("FIREBASE_CRED_PATH", r"C:\Users\ahama\Downloads\New folder (3)\packet-tracer-6ad46-firebase-adminsdk-fbsvc-8989d73c27.json")
+
+# Path to your .txt file
+TXT_FILE_PATH = r"C:\Users\ahama\OneDrive\Desktop\router.txt"  # Replace with the actual path to your file
+
+# Initialize Firebase
+try:
+    cred = credentials.Certificate(FIREBASE_CRED_PATH)
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://packet-tracer-6ad46-default-rtdb.firebaseio.com'
+    })
+    print("Firebase initialized successfully!")
+except Exception as e:
+    print("Error initializing Firebase:", e)
+    exit()
+
+# Function to determine congestion level
+def determine_congestion(metric_value):
+    if metric_value < 10:  # Lowered threshold for Low
+        return "Low"
+    elif 10 <= metric_value <= 60:  # Lowered threshold for Medium
+        return "Medium"
+    else:
+        return "High"
+
+# Function to send data to Firebase
+def send_to_firebase(data):
+    try:
+        ref = db.reference('iot_data')  # Path in Firebase where data will be stored
+        ref.push().set(data)  # 'push()' generates a unique key for each entry
+        print("Data sent to Firebase:", data)
+    except Exception as e:
+        print("Error sending data to Firebase:", e)
+
+# Function to read data from the .txt file, analyze congestion, and send to Firebase
+def analyze_and_send_data(file_path):
+    try:
+        with open(file_path, "r") as file:
+            for line in file:
+                try:
+                    # Skip lines that don't contain valid data
+                    if not line.strip() or "Starting" in line or "stopped" in line:
+                        continue
+
+                    # Extract the dictionary part from the line
+                    start = line.find("{")
+                    end = line.rfind("}") + 1
+                    if start == -1 or end == -1:
+                        print(f"Skipping invalid line: {line.strip()}")
+                        continue
+
+                    data_str = line[start:end]
+                    data = eval(data_str)  # Convert string to dictionary
+                    if not isinstance(data, dict):  # Ensure the data is a dictionary
+                        print(f"Skipping invalid line (not a dictionary): {line.strip()}")
+                        continue
+
+                    # Determine congestion level based on device type
+                    if data['device'] == 'Ceiling Fan':
+                        metric_value = data.get('speed', 0)  # Use 'speed' as the metric
+                    elif data['device'] == 'Siren':
+                        metric_value = data.get('volume', 0)  # Use 'volume' as the metric
+                    elif data['device'] == 'Light':
+                        metric_value = data.get('brightness', 0)  # Use 'brightness' as the metric
+                    elif data['device'] == 'Roche PT Speaker':
+                        metric_value = data.get('volume', 0)  # Use 'volume' as the metric
+                    else:
+                        metric_value = 0  # Default value for unknown devices
+
+                    congestion_message = determine_congestion(metric_value)
+
+                    # Add congestion message to the data
+                    data['congestion_message'] = congestion_message
+
+                    # Print the result
+                    print(f"Device: {data['device']}, Metric Value: {metric_value} -> {congestion_message}")
+
+                    # Send data to Firebase
+                    send_to_firebase(data)
+                except Exception as e:
+                    print(f"Error parsing line: {line.strip()} -> {e}")
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+    except Exception as e:
+        print(f"Error reading file: {e}")
+
+# Main script
+if __name__ == "__main__":
+    # Analyze data from the file and send to Firebase
+    analyze_and_send_data(TXT_FILE_PATH)
